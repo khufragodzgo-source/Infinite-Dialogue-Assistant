@@ -3,55 +3,86 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Switch, Route, Router as WouterRouter } from "wouter";
-import { LayoutGrid, Trash2, Send, ChevronDown } from "lucide-react";
+import { LayoutGrid, Trash2, Send, ChevronDown, Volume2 } from "lucide-react";
 import { MicButton } from "@/components/MicButton";
 import { ChatMessage } from "@/components/ChatMessage";
-import { SidePanel } from "@/components/SidePanel";
-import { useManiChat } from "@/hooks/useManiChat";
+import { SidePanel, useAlarmChecker } from "@/components/SidePanel";
+import { VoiceSettings } from "@/components/VoiceSettings";
+import { useManiChat, DEFAULT_VOICE_CONFIG, type VoiceConfig } from "@/hooks/useManiChat";
 
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: { retry: 1, staleTime: 30_000 },
-  },
+  defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
 });
 
 function ForceDark() {
-  useEffect(() => {
-    document.documentElement.classList.add("dark");
-  }, []);
+  useEffect(() => { document.documentElement.classList.add("dark"); }, []);
   return null;
 }
 
 function ManiApp() {
-  const { messages, isRecording, isProcessing, isSpeaking, startRecording, stopRecording, sendText, clearHistory } =
-    useManiChat();
+  const [voiceConfig, setVoiceConfig] = useState<VoiceConfig>(() => {
+    try {
+      const saved = localStorage.getItem("mani_voice_config");
+      return saved ? (JSON.parse(saved) as VoiceConfig) : DEFAULT_VOICE_CONFIG;
+    } catch { return DEFAULT_VOICE_CONFIG; }
+  });
+  const [autoMode, setAutoMode] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [textInput, setTextInput] = useState("");
   const [showScrollDown, setShowScrollDown] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  const handleAutoListenStart = useCallback(() => {
+    // Will be called by useManiChat after speaking ends in auto mode
+    startRecordingRef.current?.();
+  }, []);
+
+  const startRecordingRef = useRef<(() => void) | null>(null);
+
+  const {
+    messages,
+    isRecording,
+    isProcessing,
+    isSpeaking,
+    silenceCountdown,
+    startRecording,
+    stopRecording,
+    sendText,
+    clearHistory,
+  } = useManiChat({ voiceConfig, autoMode, onAutoListenStart: handleAutoListenStart });
+
+  // Keep ref up to date so handleAutoListenStart can call it
+  useEffect(() => { startRecordingRef.current = startRecording; }, [startRecording]);
+
+  // Alarm checker lives here so it's always active
+  useAlarmChecker();
+
+  // Persist voice config
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
+    localStorage.setItem("mani_voice_config", JSON.stringify(voiceConfig));
+  }, [voiceConfig]);
+
+  // Auto-scroll on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
-    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    setShowScrollDown(distFromBottom > 120);
+    setShowScrollDown(el.scrollHeight - el.scrollTop - el.clientHeight > 120);
   }, []);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
 
   const handleSendText = () => {
     if (!textInput.trim() || isProcessing) return;
     sendText(textInput);
     setTextInput("");
+  };
+
+  const handleToggleAuto = () => {
+    setAutoMode((v) => !v);
   };
 
   return (
@@ -77,6 +108,8 @@ function ManiApp() {
                 <span className="text-primary/80">Thinking…</span>
               ) : isSpeaking ? (
                 <span className="text-primary/80">Speaking…</span>
+              ) : autoMode ? (
+                <span className="text-primary/60">Continuous mode on</span>
               ) : (
                 "Your AI assistant"
               )}
@@ -84,7 +117,7 @@ function ManiApp() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           {messages.length > 0 && (
             <button
               data-testid="button-clear-history"
@@ -92,15 +125,23 @@ function ManiApp() {
               title="Clear conversation"
               className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border transition-all"
             >
-              <Trash2 size={16} />
+              <Trash2 size={15} />
             </button>
           )}
+          <button
+            data-testid="button-voice-settings"
+            onClick={() => setShowVoiceSettings(true)}
+            title="Voice settings"
+            className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border transition-all"
+          >
+            <Volume2 size={15} />
+          </button>
           <button
             data-testid="button-open-panel"
             onClick={() => setShowPanel(true)}
             className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border transition-all"
           >
-            <LayoutGrid size={16} />
+            <LayoutGrid size={15} />
           </button>
         </div>
       </header>
@@ -119,11 +160,11 @@ function ManiApp() {
             <div className="text-center space-y-1">
               <p className="font-semibold text-foreground text-lg">Hey, I'm Mani</p>
               <p className="text-sm text-muted-foreground max-w-xs">
-                Your personal AI assistant. Tap the mic to start talking, or type below.
+                Your personal AI assistant. Tap the mic or type to start.
               </p>
             </div>
             <div className="flex flex-wrap gap-2 justify-center mt-2 max-w-xs">
-              {["What can you do?", "Write me some code", "Add a to-do", "Set an alarm"].map((q) => (
+              {["What can you do?", "Write me some code", "Add a to-do", "Set an alarm for 7am IST"].map((q) => (
                 <button
                   key={q}
                   data-testid={`suggestion-${q}`}
@@ -140,15 +181,14 @@ function ManiApp() {
         {messages.map((m) => (
           <ChatMessage key={m.id} message={m} />
         ))}
-
         <div ref={messagesEndRef} />
       </div>
 
       {/* Scroll to bottom */}
       {showScrollDown && (
         <button
-          onClick={scrollToBottom}
-          className="absolute bottom-36 right-4 z-20 p-2 rounded-full bg-card border border-border shadow-lg hover:bg-accent transition-all"
+          onClick={() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })}
+          className="absolute bottom-40 right-4 z-20 p-2 rounded-full bg-card border border-border shadow-lg hover:bg-accent transition-all"
         >
           <ChevronDown size={16} className="text-muted-foreground" />
         </button>
@@ -183,13 +223,23 @@ function ManiApp() {
             isRecording={isRecording}
             isProcessing={isProcessing}
             isSpeaking={isSpeaking}
+            autoMode={autoMode}
+            silenceCountdown={silenceCountdown}
             onStart={startRecording}
             onStop={stopRecording}
+            onToggleAuto={handleToggleAuto}
           />
         </div>
       </div>
 
       {showPanel && <SidePanel onClose={() => setShowPanel(false)} />}
+      {showVoiceSettings && (
+        <VoiceSettings
+          config={voiceConfig}
+          onChange={setVoiceConfig}
+          onClose={() => setShowVoiceSettings(false)}
+        />
+      )}
     </div>
   );
 }

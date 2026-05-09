@@ -130,7 +130,7 @@ router.post("/mani/chat", async (req, res) => {
   }
 });
 
-// POST /api/mani/tts
+// POST /api/mani/tts — Inworld AI Voice with OpenAI fallback
 router.post("/mani/tts", async (req, res) => {
   const parsed = TextToSpeechBody.safeParse(req.body);
   if (!parsed.success) {
@@ -140,19 +140,49 @@ router.post("/mani/tts", async (req, res) => {
 
   const { text } = parsed.data;
 
-  try {
-    const mp3 = await openai.audio.speech.create({
-      model: "tts-1-hd",
-      voice: "nova",
-      input: text,
-      response_format: "mp3",
-    });
-    const buffer = Buffer.from(await mp3.arrayBuffer());
-    res.json({ audio: buffer.toString("base64"), format: "mp3" });
-  } catch (err) {
-    req.log.error({ err }, "TTS failed");
-    res.status(500).json({ error: "TTS failed" });
+  // Try Inworld TTS first
+  if (process.env.INWORLD_API_KEY) {
+    try {
+      const [keyId, keySecret] = process.env.INWORLD_API_KEY.split(":");
+      const basicAuth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
+
+      // Inworld Studio TTS endpoint
+      const inworldRes = await fetch(
+        "https://studio.inworld.ai/v1/workspaces/-/characters/-:simpleSendText",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Basic ${basicAuth}`,
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ text }),
+          signal: AbortSignal.timeout(8000),
+        }
+      );
+
+      if (inworldRes.ok) {
+        const data = await inworldRes.json() as Record<string, unknown>;
+        req.log.info({ keys: Object.keys(data) }, "Inworld response keys");
+        const audioBase64 =
+          (data.audioChunk as string | undefined) ||
+          (data.audio_content as string | undefined) ||
+          (data.audio as string | undefined);
+
+        if (audioBase64 && audioBase64.length > 100) {
+          res.json({ audio: audioBase64, format: "wav" });
+          return;
+        }
+      } else {
+        req.log.warn({ status: inworldRes.status }, "Inworld TTS non-OK");
+      }
+    } catch (err) {
+      req.log.warn({ err }, "Inworld TTS failed, using browser fallback");
+    }
   }
+
+  // Return signal for browser TTS fallback (no server-side audio)
+  res.status(204).end();
 });
 
 // GET /api/mani/todos
