@@ -14,3 +14,156 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * @summary Transcribe audio to text
+ */
+export const TranscribeAudioBody = zod.object({
+  audio: zod.string().describe("Base64-encoded audio data"),
+  format: zod
+    .string()
+    .optional()
+    .describe("Audio format (webm, wav, mp4, etc.)"),
+});
+
+export const TranscribeAudioResponse = zod.object({
+  text: zod.string(),
+});
+
+/**
+ * @summary Send a chat message and receive streaming response
+ */
+export const SendChatMessageBody = zod.object({
+  message: zod.string(),
+  history: zod
+    .array(
+      zod.object({
+        role: zod.string(),
+        content: zod.string(),
+      }),
+    )
+    .optional(),
+});
+
+/**
+ * @summary Convert text to speech using Inworld
+ */
+export const TextToSpeechBody = zod.object({
+  text: zod.string(),
+});
+
+export const TextToSpeechResponse = zod.object({
+  audio: zod.string().describe("Base64-encoded audio data"),
+  format: zod.string(),
+});
+
+/**
+ * @summary List all to-do items
+ */
+export const ListTodosResponseItem = zod.object({
+  id: zod.number(),
+  text: zod.string(),
+  completed: zod.boolean(),
+  createdAt: zod.coerce.date(),
+});
+export const ListTodosResponse = zod.array(ListTodosResponseItem);
+
+/**
+ * @summary Create a new to-do item
+ */
+export const CreateTodoBody = zod.object({
+  text: zod.string(),
+});
+
+/**
+ * @summary Update a to-do item
+ */
+export const UpdateTodoParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateTodoBody = zod.object({
+  text: zod.string().optional(),
+  completed: zod.boolean().optional(),
+});
+
+export const UpdateTodoResponse = zod.object({
+  id: zod.number(),
+  text: zod.string(),
+  completed: zod.boolean(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete a to-do item
+ */
+export const DeleteTodoParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary List all alarms
+ */
+export const ListAlarmsResponseItem = zod.object({
+  id: zod.number(),
+  label: zod.string(),
+  time: zod.string().describe("HH:MM 24h format"),
+  enabled: zod.boolean(),
+  days: zod
+    .array(zod.number())
+    .describe("Days of week 0=Sun..6=Sat, empty=one-time"),
+  createdAt: zod.coerce.date(),
+});
+export const ListAlarmsResponse = zod.array(ListAlarmsResponseItem);
+
+/**
+ * @summary Create a new alarm
+ */
+export const CreateAlarmBody = zod.object({
+  label: zod.string(),
+  time: zod.string(),
+  days: zod.array(zod.number()).optional(),
+});
+
+/**
+ * @summary Update an alarm
+ */
+export const UpdateAlarmParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateAlarmBody = zod.object({
+  label: zod.string().optional(),
+  time: zod.string().optional(),
+  enabled: zod.boolean().optional(),
+  days: zod.array(zod.number()).optional(),
+});
+
+export const UpdateAlarmResponse = zod.object({
+  id: zod.number(),
+  label: zod.string(),
+  time: zod.string().describe("HH:MM 24h format"),
+  enabled: zod.boolean(),
+  days: zod
+    .array(zod.number())
+    .describe("Days of week 0=Sun..6=Sat, empty=one-time"),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete an alarm
+ */
+export const DeleteAlarmParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+/**
+ * @summary Get recent chat message history
+ */
+export const GetChatHistoryResponseItem = zod.object({
+  id: zod.number(),
+  role: zod.string(),
+  content: zod.string(),
+  createdAt: zod.coerce.date(),
+});
+export const GetChatHistoryResponse = zod.array(GetChatHistoryResponseItem);

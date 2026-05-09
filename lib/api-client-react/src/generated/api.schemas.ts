@@ -8,3 +8,81 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface TranscribeInput {
+  /** Base64-encoded audio data */
+  audio: string;
+  /** Audio format (webm, wav, mp4, etc.) */
+  format?: string;
+}
+
+export interface TranscribeResult {
+  text: string;
+}
+
+export interface ChatHistoryItem {
+  role: string;
+  content: string;
+}
+
+export interface ChatInput {
+  message: string;
+  history?: ChatHistoryItem[];
+}
+
+export interface TtsInput {
+  text: string;
+}
+
+export interface TtsResult {
+  /** Base64-encoded audio data */
+  audio: string;
+  format: string;
+}
+
+export interface Todo {
+  id: number;
+  text: string;
+  completed: boolean;
+  createdAt: string;
+}
+
+export interface TodoInput {
+  text: string;
+}
+
+export interface TodoUpdate {
+  text?: string;
+  completed?: boolean;
+}
+
+export interface Alarm {
+  id: number;
+  label: string;
+  /** HH:MM 24h format */
+  time: string;
+  enabled: boolean;
+  /** Days of week 0=Sun..6=Sat, empty=one-time */
+  days: number[];
+  createdAt: string;
+}
+
+export interface AlarmInput {
+  label: string;
+  time: string;
+  days?: number[];
+}
+
+export interface AlarmUpdate {
+  label?: string;
+  time?: string;
+  enabled?: boolean;
+  days?: number[];
+}
+
+export interface ChatMessage {
+  id: number;
+  role: string;
+  content: string;
+  createdAt: string;
+}

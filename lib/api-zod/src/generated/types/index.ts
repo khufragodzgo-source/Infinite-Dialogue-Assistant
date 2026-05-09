@@ -6,4 +6,17 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./alarm";
+export * from "./alarmInput";
+export * from "./alarmUpdate";
+export * from "./chatHistoryItem";
+export * from "./chatInput";
+export * from "./chatMessage";
 export * from "./healthStatus";
+export * from "./todo";
+export * from "./todoInput";
+export * from "./todoUpdate";
+export * from "./transcribeInput";
+export * from "./transcribeResult";
+export * from "./ttsInput";
+export * from "./ttsResult";

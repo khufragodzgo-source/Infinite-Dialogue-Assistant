@@ -5,18 +5,35 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  Alarm,
+  AlarmInput,
+  AlarmUpdate,
+  ChatInput,
+  ChatMessage,
+  HealthStatus,
+  Todo,
+  TodoInput,
+  TodoUpdate,
+  TranscribeInput,
+  TranscribeResult,
+  TtsInput,
+  TtsResult,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -99,3 +116,1069 @@ export function useHealthCheck<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Transcribe audio to text
+ */
+export const getTranscribeAudioUrl = () => {
+  return `/api/mani/transcribe`;
+};
+
+export const transcribeAudio = async (
+  transcribeInput: TranscribeInput,
+  options?: RequestInit,
+): Promise<TranscribeResult> => {
+  return customFetch<TranscribeResult>(getTranscribeAudioUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(transcribeInput),
+  });
+};
+
+export const getTranscribeAudioMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof transcribeAudio>>,
+    TError,
+    { data: BodyType<TranscribeInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof transcribeAudio>>,
+  TError,
+  { data: BodyType<TranscribeInput> },
+  TContext
+> => {
+  const mutationKey = ["transcribeAudio"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof transcribeAudio>>,
+    { data: BodyType<TranscribeInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return transcribeAudio(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TranscribeAudioMutationResult = NonNullable<
+  Awaited<ReturnType<typeof transcribeAudio>>
+>;
+export type TranscribeAudioMutationBody = BodyType<TranscribeInput>;
+export type TranscribeAudioMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Transcribe audio to text
+ */
+export const useTranscribeAudio = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof transcribeAudio>>,
+    TError,
+    { data: BodyType<TranscribeInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof transcribeAudio>>,
+  TError,
+  { data: BodyType<TranscribeInput> },
+  TContext
+> => {
+  return useMutation(getTranscribeAudioMutationOptions(options));
+};
+
+/**
+ * @summary Send a chat message and receive streaming response
+ */
+export const getSendChatMessageUrl = () => {
+  return `/api/mani/chat`;
+};
+
+export const sendChatMessage = async (
+  chatInput: ChatInput,
+  options?: RequestInit,
+): Promise<unknown> => {
+  return customFetch<unknown>(getSendChatMessageUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(chatInput),
+  });
+};
+
+export const getSendChatMessageMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendChatMessage>>,
+    TError,
+    { data: BodyType<ChatInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof sendChatMessage>>,
+  TError,
+  { data: BodyType<ChatInput> },
+  TContext
+> => {
+  const mutationKey = ["sendChatMessage"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof sendChatMessage>>,
+    { data: BodyType<ChatInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return sendChatMessage(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SendChatMessageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof sendChatMessage>>
+>;
+export type SendChatMessageMutationBody = BodyType<ChatInput>;
+export type SendChatMessageMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Send a chat message and receive streaming response
+ */
+export const useSendChatMessage = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendChatMessage>>,
+    TError,
+    { data: BodyType<ChatInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof sendChatMessage>>,
+  TError,
+  { data: BodyType<ChatInput> },
+  TContext
+> => {
+  return useMutation(getSendChatMessageMutationOptions(options));
+};
+
+/**
+ * @summary Convert text to speech using Inworld
+ */
+export const getTextToSpeechUrl = () => {
+  return `/api/mani/tts`;
+};
+
+export const textToSpeech = async (
+  ttsInput: TtsInput,
+  options?: RequestInit,
+): Promise<TtsResult> => {
+  return customFetch<TtsResult>(getTextToSpeechUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(ttsInput),
+  });
+};
+
+export const getTextToSpeechMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof textToSpeech>>,
+    TError,
+    { data: BodyType<TtsInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof textToSpeech>>,
+  TError,
+  { data: BodyType<TtsInput> },
+  TContext
+> => {
+  const mutationKey = ["textToSpeech"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof textToSpeech>>,
+    { data: BodyType<TtsInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return textToSpeech(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type TextToSpeechMutationResult = NonNullable<
+  Awaited<ReturnType<typeof textToSpeech>>
+>;
+export type TextToSpeechMutationBody = BodyType<TtsInput>;
+export type TextToSpeechMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Convert text to speech using Inworld
+ */
+export const useTextToSpeech = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof textToSpeech>>,
+    TError,
+    { data: BodyType<TtsInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof textToSpeech>>,
+  TError,
+  { data: BodyType<TtsInput> },
+  TContext
+> => {
+  return useMutation(getTextToSpeechMutationOptions(options));
+};
+
+/**
+ * @summary List all to-do items
+ */
+export const getListTodosUrl = () => {
+  return `/api/mani/todos`;
+};
+
+export const listTodos = async (options?: RequestInit): Promise<Todo[]> => {
+  return customFetch<Todo[]>(getListTodosUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListTodosQueryKey = () => {
+  return [`/api/mani/todos`] as const;
+};
+
+export const getListTodosQueryOptions = <
+  TData = Awaited<ReturnType<typeof listTodos>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listTodos>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListTodosQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listTodos>>> = ({
+    signal,
+  }) => listTodos({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listTodos>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListTodosQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listTodos>>
+>;
+export type ListTodosQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all to-do items
+ */
+
+export function useListTodos<
+  TData = Awaited<ReturnType<typeof listTodos>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<Awaited<ReturnType<typeof listTodos>>, TError, TData>;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListTodosQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a new to-do item
+ */
+export const getCreateTodoUrl = () => {
+  return `/api/mani/todos`;
+};
+
+export const createTodo = async (
+  todoInput: TodoInput,
+  options?: RequestInit,
+): Promise<Todo> => {
+  return customFetch<Todo>(getCreateTodoUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(todoInput),
+  });
+};
+
+export const getCreateTodoMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createTodo>>,
+    TError,
+    { data: BodyType<TodoInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createTodo>>,
+  TError,
+  { data: BodyType<TodoInput> },
+  TContext
+> => {
+  const mutationKey = ["createTodo"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createTodo>>,
+    { data: BodyType<TodoInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createTodo(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateTodoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createTodo>>
+>;
+export type CreateTodoMutationBody = BodyType<TodoInput>;
+export type CreateTodoMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a new to-do item
+ */
+export const useCreateTodo = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createTodo>>,
+    TError,
+    { data: BodyType<TodoInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createTodo>>,
+  TError,
+  { data: BodyType<TodoInput> },
+  TContext
+> => {
+  return useMutation(getCreateTodoMutationOptions(options));
+};
+
+/**
+ * @summary Update a to-do item
+ */
+export const getUpdateTodoUrl = (id: number) => {
+  return `/api/mani/todos/${id}`;
+};
+
+export const updateTodo = async (
+  id: number,
+  todoUpdate: TodoUpdate,
+  options?: RequestInit,
+): Promise<Todo> => {
+  return customFetch<Todo>(getUpdateTodoUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(todoUpdate),
+  });
+};
+
+export const getUpdateTodoMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTodo>>,
+    TError,
+    { id: number; data: BodyType<TodoUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateTodo>>,
+  TError,
+  { id: number; data: BodyType<TodoUpdate> },
+  TContext
+> => {
+  const mutationKey = ["updateTodo"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateTodo>>,
+    { id: number; data: BodyType<TodoUpdate> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateTodo(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateTodoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateTodo>>
+>;
+export type UpdateTodoMutationBody = BodyType<TodoUpdate>;
+export type UpdateTodoMutationError = ErrorType<void>;
+
+/**
+ * @summary Update a to-do item
+ */
+export const useUpdateTodo = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateTodo>>,
+    TError,
+    { id: number; data: BodyType<TodoUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateTodo>>,
+  TError,
+  { id: number; data: BodyType<TodoUpdate> },
+  TContext
+> => {
+  return useMutation(getUpdateTodoMutationOptions(options));
+};
+
+/**
+ * @summary Delete a to-do item
+ */
+export const getDeleteTodoUrl = (id: number) => {
+  return `/api/mani/todos/${id}`;
+};
+
+export const deleteTodo = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteTodoUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteTodoMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteTodo>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteTodo>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteTodo"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteTodo>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteTodo(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteTodoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteTodo>>
+>;
+
+export type DeleteTodoMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete a to-do item
+ */
+export const useDeleteTodo = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteTodo>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteTodo>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteTodoMutationOptions(options));
+};
+
+/**
+ * @summary List all alarms
+ */
+export const getListAlarmsUrl = () => {
+  return `/api/mani/alarms`;
+};
+
+export const listAlarms = async (options?: RequestInit): Promise<Alarm[]> => {
+  return customFetch<Alarm[]>(getListAlarmsUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListAlarmsQueryKey = () => {
+  return [`/api/mani/alarms`] as const;
+};
+
+export const getListAlarmsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listAlarms>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAlarms>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListAlarmsQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listAlarms>>> = ({
+    signal,
+  }) => listAlarms({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listAlarms>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListAlarmsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listAlarms>>
+>;
+export type ListAlarmsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all alarms
+ */
+
+export function useListAlarms<
+  TData = Awaited<ReturnType<typeof listAlarms>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listAlarms>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListAlarmsQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Create a new alarm
+ */
+export const getCreateAlarmUrl = () => {
+  return `/api/mani/alarms`;
+};
+
+export const createAlarm = async (
+  alarmInput: AlarmInput,
+  options?: RequestInit,
+): Promise<Alarm> => {
+  return customFetch<Alarm>(getCreateAlarmUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(alarmInput),
+  });
+};
+
+export const getCreateAlarmMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createAlarm>>,
+    TError,
+    { data: BodyType<AlarmInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof createAlarm>>,
+  TError,
+  { data: BodyType<AlarmInput> },
+  TContext
+> => {
+  const mutationKey = ["createAlarm"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof createAlarm>>,
+    { data: BodyType<AlarmInput> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return createAlarm(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type CreateAlarmMutationResult = NonNullable<
+  Awaited<ReturnType<typeof createAlarm>>
+>;
+export type CreateAlarmMutationBody = BodyType<AlarmInput>;
+export type CreateAlarmMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Create a new alarm
+ */
+export const useCreateAlarm = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof createAlarm>>,
+    TError,
+    { data: BodyType<AlarmInput> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof createAlarm>>,
+  TError,
+  { data: BodyType<AlarmInput> },
+  TContext
+> => {
+  return useMutation(getCreateAlarmMutationOptions(options));
+};
+
+/**
+ * @summary Update an alarm
+ */
+export const getUpdateAlarmUrl = (id: number) => {
+  return `/api/mani/alarms/${id}`;
+};
+
+export const updateAlarm = async (
+  id: number,
+  alarmUpdate: AlarmUpdate,
+  options?: RequestInit,
+): Promise<Alarm> => {
+  return customFetch<Alarm>(getUpdateAlarmUrl(id), {
+    ...options,
+    method: "PUT",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(alarmUpdate),
+  });
+};
+
+export const getUpdateAlarmMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAlarm>>,
+    TError,
+    { id: number; data: BodyType<AlarmUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof updateAlarm>>,
+  TError,
+  { id: number; data: BodyType<AlarmUpdate> },
+  TContext
+> => {
+  const mutationKey = ["updateAlarm"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof updateAlarm>>,
+    { id: number; data: BodyType<AlarmUpdate> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return updateAlarm(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UpdateAlarmMutationResult = NonNullable<
+  Awaited<ReturnType<typeof updateAlarm>>
+>;
+export type UpdateAlarmMutationBody = BodyType<AlarmUpdate>;
+export type UpdateAlarmMutationError = ErrorType<void>;
+
+/**
+ * @summary Update an alarm
+ */
+export const useUpdateAlarm = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof updateAlarm>>,
+    TError,
+    { id: number; data: BodyType<AlarmUpdate> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof updateAlarm>>,
+  TError,
+  { id: number; data: BodyType<AlarmUpdate> },
+  TContext
+> => {
+  return useMutation(getUpdateAlarmMutationOptions(options));
+};
+
+/**
+ * @summary Delete an alarm
+ */
+export const getDeleteAlarmUrl = (id: number) => {
+  return `/api/mani/alarms/${id}`;
+};
+
+export const deleteAlarm = async (
+  id: number,
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getDeleteAlarmUrl(id), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getDeleteAlarmMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAlarm>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof deleteAlarm>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["deleteAlarm"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof deleteAlarm>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return deleteAlarm(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DeleteAlarmMutationResult = NonNullable<
+  Awaited<ReturnType<typeof deleteAlarm>>
+>;
+
+export type DeleteAlarmMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Delete an alarm
+ */
+export const useDeleteAlarm = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof deleteAlarm>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof deleteAlarm>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getDeleteAlarmMutationOptions(options));
+};
+
+/**
+ * @summary Get recent chat message history
+ */
+export const getGetChatHistoryUrl = () => {
+  return `/api/mani/history`;
+};
+
+export const getChatHistory = async (
+  options?: RequestInit,
+): Promise<ChatMessage[]> => {
+  return customFetch<ChatMessage[]>(getGetChatHistoryUrl(), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetChatHistoryQueryKey = () => {
+  return [`/api/mani/history`] as const;
+};
+
+export const getGetChatHistoryQueryOptions = <
+  TData = Awaited<ReturnType<typeof getChatHistory>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getChatHistory>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getGetChatHistoryQueryKey();
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getChatHistory>>> = ({
+    signal,
+  }) => getChatHistory({ signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getChatHistory>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type GetChatHistoryQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getChatHistory>>
+>;
+export type GetChatHistoryQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get recent chat message history
+ */
+
+export function useGetChatHistory<
+  TData = Awaited<ReturnType<typeof getChatHistory>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof getChatHistory>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetChatHistoryQueryOptions(options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Clear all chat history
+ */
+export const getClearChatHistoryUrl = () => {
+  return `/api/mani/history`;
+};
+
+export const clearChatHistory = async (
+  options?: RequestInit,
+): Promise<void> => {
+  return customFetch<void>(getClearChatHistoryUrl(), {
+    ...options,
+    method: "DELETE",
+  });
+};
+
+export const getClearChatHistoryMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clearChatHistory>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof clearChatHistory>>,
+  TError,
+  void,
+  TContext
+> => {
+  const mutationKey = ["clearChatHistory"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof clearChatHistory>>,
+    void
+  > = () => {
+    return clearChatHistory(requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ClearChatHistoryMutationResult = NonNullable<
+  Awaited<ReturnType<typeof clearChatHistory>>
+>;
+
+export type ClearChatHistoryMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Clear all chat history
+ */
+export const useClearChatHistory = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof clearChatHistory>>,
+    TError,
+    void,
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof clearChatHistory>>,
+  TError,
+  void,
+  TContext
+> => {
+  return useMutation(getClearChatHistoryMutationOptions(options));
+};

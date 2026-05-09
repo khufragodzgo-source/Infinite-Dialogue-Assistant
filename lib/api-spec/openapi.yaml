@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: mani
+    description: Mani AI assistant operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,228 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /mani/transcribe:
+    post:
+      operationId: transcribeAudio
+      tags: [mani]
+      summary: Transcribe audio to text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TranscribeInput"
+      responses:
+        "200":
+          description: Transcription result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranscribeResult"
+
+  /mani/chat:
+    post:
+      operationId: sendChatMessage
+      tags: [mani]
+      summary: Send a chat message and receive streaming response
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatInput"
+      responses:
+        "200":
+          description: SSE stream of assistant response chunks
+          content:
+            text/event-stream: {}
+
+  /mani/tts:
+    post:
+      operationId: textToSpeech
+      tags: [mani]
+      summary: Convert text to speech using Inworld
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TtsInput"
+      responses:
+        "200":
+          description: Audio data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TtsResult"
+
+  /mani/todos:
+    get:
+      operationId: listTodos
+      tags: [mani]
+      summary: List all to-do items
+      responses:
+        "200":
+          description: List of todos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Todo"
+    post:
+      operationId: createTodo
+      tags: [mani]
+      summary: Create a new to-do item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TodoInput"
+      responses:
+        "201":
+          description: Created todo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Todo"
+
+  /mani/todos/{id}:
+    put:
+      operationId: updateTodo
+      tags: [mani]
+      summary: Update a to-do item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TodoUpdate"
+      responses:
+        "200":
+          description: Updated todo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Todo"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteTodo
+      tags: [mani]
+      summary: Delete a to-do item
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /mani/alarms:
+    get:
+      operationId: listAlarms
+      tags: [mani]
+      summary: List all alarms
+      responses:
+        "200":
+          description: List of alarms
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Alarm"
+    post:
+      operationId: createAlarm
+      tags: [mani]
+      summary: Create a new alarm
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlarmInput"
+      responses:
+        "201":
+          description: Created alarm
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alarm"
+
+  /mani/alarms/{id}:
+    put:
+      operationId: updateAlarm
+      tags: [mani]
+      summary: Update an alarm
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AlarmUpdate"
+      responses:
+        "200":
+          description: Updated alarm
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Alarm"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteAlarm
+      tags: [mani]
+      summary: Delete an alarm
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /mani/history:
+    get:
+      operationId: getChatHistory
+      tags: [mani]
+      summary: Get recent chat message history
+      responses:
+        "200":
+          description: List of recent messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChatMessage"
+    delete:
+      operationId: clearChatHistory
+      tags: [mani]
+      summary: Clear all chat history
+      responses:
+        "204":
+          description: Cleared
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +258,174 @@ components:
       required:
         - status
 
+    TranscribeInput:
+      type: object
+      properties:
+        audio:
+          type: string
+          description: Base64-encoded audio data
+        format:
+          type: string
+          description: Audio format (webm, wav, mp4, etc.)
+      required:
+        - audio
+
+    TranscribeResult:
+      type: object
+      properties:
+        text:
+          type: string
+      required:
+        - text
+
+    ChatInput:
+      type: object
+      properties:
+        message:
+          type: string
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatHistoryItem"
+      required:
+        - message
+
+    ChatHistoryItem:
+      type: object
+      properties:
+        role:
+          type: string
+        content:
+          type: string
+      required:
+        - role
+        - content
+
+    TtsInput:
+      type: object
+      properties:
+        text:
+          type: string
+      required:
+        - text
+
+    TtsResult:
+      type: object
+      properties:
+        audio:
+          type: string
+          description: Base64-encoded audio data
+        format:
+          type: string
+      required:
+        - audio
+        - format
+
+    Todo:
+      type: object
+      properties:
+        id:
+          type: integer
+        text:
+          type: string
+        completed:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - text
+        - completed
+        - createdAt
+
+    TodoInput:
+      type: object
+      properties:
+        text:
+          type: string
+      required:
+        - text
+
+    TodoUpdate:
+      type: object
+      properties:
+        text:
+          type: string
+        completed:
+          type: boolean
+
+    Alarm:
+      type: object
+      properties:
+        id:
+          type: integer
+        label:
+          type: string
+        time:
+          type: string
+          description: HH:MM 24h format
+        enabled:
+          type: boolean
+        days:
+          type: array
+          items:
+            type: integer
+          description: Days of week 0=Sun..6=Sat, empty=one-time
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - label
+        - time
+        - enabled
+        - days
+        - createdAt
+
+    AlarmInput:
+      type: object
+      properties:
+        label:
+          type: string
+        time:
+          type: string
+        days:
+          type: array
+          items:
+            type: integer
+      required:
+        - label
+        - time
+
+    AlarmUpdate:
+      type: object
+      properties:
+        label:
+          type: string
+        time:
+          type: string
+        enabled:
+          type: boolean
+        days:
+          type: array
+          items:
+            type: integer
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        role:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - role
+        - content
+        - createdAt
