@@ -306,6 +306,10 @@ components:
       properties:
         text:
           type: string
+        voice:
+          type: string
+          enum: [alloy, echo, fable, onyx, nova, shimmer]
+          default: nova
       required:
         - text
 

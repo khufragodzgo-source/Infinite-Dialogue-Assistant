@@ -7,19 +7,17 @@ export type Message = {
   isStreaming?: boolean;
 };
 
-export type VoiceMode = "browser" | "inworld";
+export type OpenAIVoice = "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
 
 export type VoiceConfig = {
-  mode: VoiceMode;
-  browserVoiceURI: string;
+  openaiVoice: OpenAIVoice;
   rate: number;
   pitch: number;
 };
 
 export const DEFAULT_VOICE_CONFIG: VoiceConfig = {
-  mode: "inworld",
-  browserVoiceURI: "",
-  rate: 1.05,
+  openaiVoice: "nova",
+  rate: 1.0,
   pitch: 1,
 };
 
@@ -41,29 +39,18 @@ type UseManiChatReturn = {
   clearHistory: () => void;
 };
 
-function pickBrowserVoice(uri?: string): SpeechSynthesisVoice | null {
+function pickBrowserVoice(): SpeechSynthesisVoice | null {
   const voices = window.speechSynthesis.getVoices();
-  if (uri) {
-    const match = voices.find((v) => v.voiceURI === uri);
-    if (match) return match;
-  }
   const preferred = [
     "Google US English",
     "Microsoft Aria Online (Natural) - English (United States)",
-    "Microsoft Jenny Online (Natural) - English (United States)",
     "Samantha",
-    "Karen",
-    "Moira",
   ];
   for (const name of preferred) {
     const v = voices.find((v) => v.name === name);
     if (v) return v;
   }
-  return (
-    voices.find((v) => v.lang.startsWith("en") && !v.name.toLowerCase().includes("male")) ??
-    voices.find((v) => v.lang.startsWith("en")) ??
-    null
-  );
+  return voices.find((v) => v.lang.startsWith("en")) ?? null;
 }
 
 function cleanForSpeech(text: string): string {
@@ -101,9 +88,9 @@ export function useManiChat({
   useEffect(() => { autoModeRef.current = autoMode; }, [autoMode]);
   useEffect(() => { voiceConfigRef.current = voiceConfig; }, [voiceConfig]);
 
-  // Load browser voices
+  // Pre-load browser voices (used as fallback)
   useEffect(() => {
-    const load = () => { window.speechSynthesis.getVoices(); };
+    const load = () => window.speechSynthesis.getVoices();
     load();
     window.speechSynthesis.addEventListener("voiceschanged", load);
     return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
@@ -136,54 +123,45 @@ export function useManiChat({
     });
   }, []);
 
-  const speakBrowser = useCallback(
-    (text: string, onDone: () => void) => {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      const voice = pickBrowserVoice(voiceConfigRef.current.browserVoiceURI);
-      if (voice) utterance.voice = voice;
-      utterance.lang = "en-US";
-      utterance.rate = voiceConfigRef.current.rate;
-      utterance.pitch = voiceConfigRef.current.pitch;
-      utterance.volume = 1;
-      utterance.onend = onDone;
-      utterance.onerror = onDone;
-      window.speechSynthesis.speak(utterance);
-    },
-    []
-  );
+  const speakBrowserFallback = useCallback((text: string, onDone: () => void) => {
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    const voice = pickBrowserVoice();
+    if (voice) utt.voice = voice;
+    utt.lang = "en-US";
+    utt.rate = voiceConfigRef.current.rate;
+    utt.onend = onDone;
+    utt.onerror = onDone;
+    window.speechSynthesis.speak(utt);
+  }, []);
 
-  const speakInworld = useCallback(
+  const speakOpenAI = useCallback(
     async (text: string, onDone: () => void) => {
       try {
         const res = await fetch("/api/mani/tts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, voice: voiceConfigRef.current.openaiVoice }),
         });
-        // 204 = Inworld unavailable, fall back to browser
-        if (res.status === 204) {
-          speakBrowser(text, onDone);
-          return;
-        }
-        if (!res.ok) throw new Error("TTS request failed");
+        if (res.status === 204) { speakBrowserFallback(text, onDone); return; }
+        if (!res.ok) throw new Error("TTS failed");
         const data = (await res.json()) as { audio?: string; format?: string };
-        if (!data.audio) throw new Error("No audio in response");
+        if (!data.audio) throw new Error("No audio");
 
         const byteChars = atob(data.audio);
-        const byteArr = new Uint8Array(byteChars.length);
-        for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
-        const blob = new Blob([byteArr], { type: `audio/${data.format ?? "mp3"}` });
+        const bytes = new Uint8Array(byteChars.length);
+        for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+        const blob = new Blob([bytes], { type: `audio/${data.format ?? "mp3"}` });
         const url = URL.createObjectURL(blob);
         const audio = new Audio(url);
         audio.onended = () => { URL.revokeObjectURL(url); onDone(); };
         audio.onerror = () => { URL.revokeObjectURL(url); onDone(); };
         await audio.play();
       } catch {
-        speakBrowser(text, onDone);
+        speakBrowserFallback(text, onDone);
       }
     },
-    [speakBrowser]
+    [speakBrowserFallback]
   );
 
   const speakText = useCallback(
@@ -191,23 +169,13 @@ export function useManiChat({
       const clean = cleanForSpeech(text);
       if (!clean) return;
       setIsSpeaking(true);
-
       const onDone = () => {
         setIsSpeaking(false);
-        if (autoModeRef.current) {
-          setTimeout(() => {
-            onAutoListenStart?.();
-          }, 400);
-        }
+        if (autoModeRef.current) setTimeout(() => onAutoListenStart?.(), 400);
       };
-
-      if (voiceConfigRef.current.mode === "inworld") {
-        void speakInworld(clean, onDone);
-      } else {
-        speakBrowser(clean, onDone);
-      }
+      void speakOpenAI(clean, onDone);
     },
-    [speakInworld, speakBrowser, onAutoListenStart]
+    [speakOpenAI, onAutoListenStart]
   );
 
   const stopSpeaking = useCallback(() => {

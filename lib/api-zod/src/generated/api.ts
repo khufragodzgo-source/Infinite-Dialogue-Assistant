@@ -48,8 +48,13 @@ export const SendChatMessageBody = zod.object({
 /**
  * @summary Convert text to speech using Inworld
  */
+export const textToSpeechBodyVoiceDefault = `nova`;
+
 export const TextToSpeechBody = zod.object({
   text: zod.string(),
+  voice: zod
+    .enum(["alloy", "echo", "fable", "onyx", "nova", "shimmer"])
+    .default(textToSpeechBodyVoiceDefault),
 });
 
 export const TextToSpeechResponse = zod.object({

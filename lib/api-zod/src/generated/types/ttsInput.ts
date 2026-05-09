@@ -5,7 +5,9 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { TtsInputVoice } from "./ttsInputVoice";
 
 export interface TtsInput {
   text: string;
+  voice?: TtsInputVoice;
 }

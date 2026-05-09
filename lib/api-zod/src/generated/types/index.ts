@@ -19,4 +19,5 @@ export * from "./todoUpdate";
 export * from "./transcribeInput";
 export * from "./transcribeResult";
 export * from "./ttsInput";
+export * from "./ttsInputVoice";
 export * from "./ttsResult";

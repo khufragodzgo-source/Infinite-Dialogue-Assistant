@@ -30,8 +30,20 @@ export interface ChatInput {
   history?: ChatHistoryItem[];
 }
 
+export type TtsInputVoice = (typeof TtsInputVoice)[keyof typeof TtsInputVoice];
+
+export const TtsInputVoice = {
+  alloy: "alloy",
+  echo: "echo",
+  fable: "fable",
+  onyx: "onyx",
+  nova: "nova",
+  shimmer: "shimmer",
+} as const;
+
 export interface TtsInput {
   text: string;
+  voice?: TtsInputVoice;
 }
 
 export interface TtsResult {

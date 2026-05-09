@@ -3,6 +3,7 @@ import { db } from "@workspace/db";
 import { todosTable, alarmsTable, chatMessagesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { openai } from "../lib/openai";
+import { openai as audioOpenai } from "@workspace/integrations-openai-ai-server/audio";
 import {
   TranscribeAudioBody,
   SendChatMessageBody,
@@ -130,7 +131,7 @@ router.post("/mani/chat", async (req, res) => {
   }
 });
 
-// POST /api/mani/tts — Inworld AI Voice with OpenAI fallback
+// POST /api/mani/tts — OpenAI gpt-audio-mini TTS
 router.post("/mani/tts", async (req, res) => {
   const parsed = TextToSpeechBody.safeParse(req.body);
   if (!parsed.success) {
@@ -138,51 +139,36 @@ router.post("/mani/tts", async (req, res) => {
     return;
   }
 
-  const { text } = parsed.data;
+  const { text, voice = "nova" } = parsed.data;
+  const safeVoice = (["alloy", "echo", "fable", "onyx", "nova", "shimmer"].includes(voice ?? "")
+    ? voice
+    : "nova") as "alloy" | "echo" | "fable" | "onyx" | "nova" | "shimmer";
 
-  // Try Inworld TTS first
-  if (process.env.INWORLD_API_KEY) {
-    try {
-      const [keyId, keySecret] = process.env.INWORLD_API_KEY.split(":");
-      const basicAuth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-
-      // Inworld Studio TTS endpoint
-      const inworldRes = await fetch(
-        "https://studio.inworld.ai/v1/workspaces/-/characters/-:simpleSendText",
+  try {
+    const response = await audioOpenai.chat.completions.create({
+      model: "gpt-audio-mini",
+      modalities: ["text", "audio"],
+      audio: { voice: safeVoice, format: "mp3" },
+      messages: [
         {
-          method: "POST",
-          headers: {
-            Authorization: `Basic ${basicAuth}`,
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-          body: JSON.stringify({ text }),
-          signal: AbortSignal.timeout(8000),
-        }
-      );
+          role: "system",
+          content: "You are a text-to-speech assistant. Repeat the user's text verbatim, naturally and clearly.",
+        },
+        { role: "user", content: text },
+      ],
+    });
 
-      if (inworldRes.ok) {
-        const data = await inworldRes.json() as Record<string, unknown>;
-        req.log.info({ keys: Object.keys(data) }, "Inworld response keys");
-        const audioBase64 =
-          (data.audioChunk as string | undefined) ||
-          (data.audio_content as string | undefined) ||
-          (data.audio as string | undefined);
-
-        if (audioBase64 && audioBase64.length > 100) {
-          res.json({ audio: audioBase64, format: "wav" });
-          return;
-        }
-      } else {
-        req.log.warn({ status: inworldRes.status }, "Inworld TTS non-OK");
-      }
-    } catch (err) {
-      req.log.warn({ err }, "Inworld TTS failed, using browser fallback");
+    const audioData = ((response.choices[0]?.message as unknown) as { audio?: { data?: string } } | undefined)?.audio?.data ?? "";
+    if (!audioData) {
+      res.status(204).end();
+      return;
     }
-  }
 
-  // Return signal for browser TTS fallback (no server-side audio)
-  res.status(204).end();
+    res.json({ audio: audioData, format: "mp3" });
+  } catch (err) {
+    req.log.warn({ err }, "gpt-audio-mini TTS failed");
+    res.status(204).end();
+  }
 });
 
 // GET /api/mani/todos
