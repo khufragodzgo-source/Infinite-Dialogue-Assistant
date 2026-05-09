@@ -1,5 +1,4 @@
-import { useState, useRef, useCallback } from "react";
-import { useTextToSpeech } from "@workspace/api-client-react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 export type Message = {
   id: string;
@@ -19,17 +18,43 @@ type UseManiChatReturn = {
   clearHistory: () => void;
 };
 
+function pickVoice(): SpeechSynthesisVoice | null {
+  const voices = window.speechSynthesis.getVoices();
+  const preferred = [
+    "Google US English",
+    "Microsoft Aria Online (Natural) - English (United States)",
+    "Microsoft Jenny Online (Natural) - English (United States)",
+    "Samantha",
+    "Karen",
+    "Moira",
+  ];
+  for (const name of preferred) {
+    const v = voices.find((v) => v.name === name);
+    if (v) return v;
+  }
+  const en = voices.find((v) => v.lang.startsWith("en") && !v.name.toLowerCase().includes("male"));
+  return en ?? voices.find((v) => v.lang.startsWith("en")) ?? null;
+}
+
 export function useManiChat(): UseManiChatReturn {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voicesReady, setVoicesReady] = useState(false);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
-  const tts = useTextToSpeech();
+
+  // Load voices — browsers fire voiceschanged when ready
+  useEffect(() => {
+    const load = () => {
+      if (window.speechSynthesis.getVoices().length > 0) setVoicesReady(true);
+    };
+    load();
+    window.speechSynthesis.addEventListener("voiceschanged", load);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
+  }, []);
 
   const addMessage = useCallback((msg: Message) => {
     setMessages((prev) => [...prev, msg]);
@@ -46,46 +71,34 @@ export function useManiChat(): UseManiChatReturn {
   }, []);
 
   const speakText = useCallback(
-    async (text: string) => {
+    (text: string) => {
       const cleanText = text
-        .replace(/```[\s\S]*?```/g, " [code block] ")
+        .replace(/```[\s\S]*?```/g, " code block. ")
         .replace(/`[^`]+`/g, (m) => m.slice(1, -1))
-        .replace(/[*_~#>]/g, "")
+        .replace(/[*_~#>•\-]/g, " ")
         .replace(/\s+/g, " ")
         .trim();
 
       if (!cleanText) return;
 
-      try {
-        setIsSpeaking(true);
-        const result = await tts.mutateAsync({ data: { text: cleanText } });
-        if (result.audio) {
-          const audioData = result.audio;
-          const format = result.format || "mp3";
-          const byteChars = atob(audioData);
-          const byteArr = new Uint8Array(byteChars.length);
-          for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
-          const blob = new Blob([byteArr], { type: `audio/${format}` });
-          const url = URL.createObjectURL(blob);
-          const audio = new Audio(url);
-          currentAudioRef.current = audio;
-          audio.onended = () => {
-            setIsSpeaking(false);
-            URL.revokeObjectURL(url);
-          };
-          audio.onerror = () => {
-            setIsSpeaking(false);
-            URL.revokeObjectURL(url);
-          };
-          await audio.play();
-        } else {
-          setIsSpeaking(false);
-        }
-      } catch {
-        setIsSpeaking(false);
-      }
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      const voice = pickVoice();
+      if (voice) utterance.voice = voice;
+      utterance.lang = "en-US";
+      utterance.rate = 1.05;
+      utterance.pitch = 1;
+      utterance.volume = 1;
+
+      setIsSpeaking(true);
+
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+
+      window.speechSynthesis.speak(utterance);
     },
-    [tts]
+    [voicesReady] // re-create when voices load so pickVoice() has them
   );
 
   const streamChat = useCallback(
@@ -104,6 +117,7 @@ export function useManiChat(): UseManiChatReturn {
 
         if (!res.ok || !res.body) {
           updateLastAssistantMessage("Sorry, I couldn't process your request.", false);
+          setIsProcessing(false);
           return;
         }
 
@@ -120,14 +134,18 @@ export function useManiChat(): UseManiChatReturn {
               const data = line.slice(6).trim();
               if (!data) continue;
               try {
-                const parsed = JSON.parse(data) as { content?: string; done?: boolean; error?: string };
+                const parsed = JSON.parse(data) as {
+                  content?: string;
+                  done?: boolean;
+                  error?: string;
+                };
                 if (parsed.content) {
                   fullContent += parsed.content;
                   updateLastAssistantMessage(fullContent, true);
                 } else if (parsed.done) {
                   updateLastAssistantMessage(fullContent, false);
                   setIsProcessing(false);
-                  void speakText(fullContent);
+                  speakText(fullContent);
                   return;
                 } else if (parsed.error) {
                   updateLastAssistantMessage("Sorry, something went wrong.", false);
@@ -142,7 +160,7 @@ export function useManiChat(): UseManiChatReturn {
         }
         updateLastAssistantMessage(fullContent, false);
         setIsProcessing(false);
-        void speakText(fullContent);
+        speakText(fullContent);
       } catch {
         updateLastAssistantMessage("Sorry, I couldn't reach the server.", false);
         setIsProcessing(false);
@@ -154,6 +172,8 @@ export function useManiChat(): UseManiChatReturn {
   const sendText = useCallback(
     (text: string) => {
       if (!text.trim() || isProcessing) return;
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
       const userMsg: Message = { id: `user-${Date.now()}`, role: "user", content: text.trim() };
       setMessages((prev) => {
         const next = [...prev, userMsg];
@@ -170,11 +190,17 @@ export function useManiChat(): UseManiChatReturn {
       setIsProcessing(true);
       try {
         const buffer = await audioBlob.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+        // Encode in chunks to avoid call stack overflow on large buffers
+        const bytes = new Uint8Array(buffer);
+        let binary = "";
+        const chunkSize = 8192;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        }
+        const base64 = btoa(binary);
+
         const mimeType = audioBlob.type || "audio/webm";
-        const format = mimeType.includes("webm")
-          ? "webm"
-          : mimeType.includes("ogg")
+        const format = mimeType.includes("ogg")
           ? "ogg"
           : mimeType.includes("mp4")
           ? "mp4"
@@ -195,7 +221,11 @@ export function useManiChat(): UseManiChatReturn {
           setIsProcessing(false);
           return;
         }
-        const userMsg: Message = { id: `user-${Date.now()}`, role: "user", content: text.trim() };
+        const userMsg: Message = {
+          id: `user-${Date.now()}`,
+          role: "user",
+          content: text.trim(),
+        };
         setMessages((prev) => {
           const next = [...prev, userMsg];
           void streamChat(userMsg.content, next);
@@ -210,12 +240,18 @@ export function useManiChat(): UseManiChatReturn {
 
   const startRecording = useCallback(async () => {
     if (isRecording || isProcessing) return;
-    if (currentAudioRef.current) {
-      currentAudioRef.current.pause();
-      setIsSpeaking(false);
-    }
+    // Stop any current speech
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          sampleRate: 44100,
+        },
+      });
       audioChunksRef.current = [];
 
       const options: MediaRecorderOptions = {};
@@ -227,15 +263,19 @@ export function useManiChat(): UseManiChatReturn {
 
       const recorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = recorder;
+
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
       recorder.onstop = () => {
         stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        const blob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
         void transcribeAndSend(blob);
       };
-      recorder.start(250);
+
+      recorder.start(100);
       setIsRecording(true);
     } catch {
       setIsRecording(false);
@@ -250,6 +290,8 @@ export function useManiChat(): UseManiChatReturn {
   }, [isRecording]);
 
   const clearHistory = useCallback(() => {
+    window.speechSynthesis.cancel();
+    setIsSpeaking(false);
     setMessages([]);
     void fetch("/api/mani/history", { method: "DELETE" });
   }, []);

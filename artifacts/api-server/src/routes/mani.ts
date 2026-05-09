@@ -54,8 +54,11 @@ router.post("/mani/transcribe", async (req, res) => {
 
     const transcription = await openai.audio.transcriptions.create({
       file: audioFile,
-      model: "gpt-4o-mini-transcribe",
+      model: "gpt-4o-transcribe",
       response_format: "json",
+      language: "en",
+      prompt:
+        "The user is speaking casual conversational English. They may have an accent or unclear pronunciation. Transcribe exactly what is said, including informal words, slang, and incomplete sentences.",
     });
 
     res.json({ text: transcription.text });
@@ -127,7 +130,7 @@ router.post("/mani/chat", async (req, res) => {
   }
 });
 
-// POST /api/mani/tts — Inworld TTS
+// POST /api/mani/tts
 router.post("/mani/tts", async (req, res) => {
   const parsed = TextToSpeechBody.safeParse(req.body);
   if (!parsed.success) {
@@ -137,79 +140,18 @@ router.post("/mani/tts", async (req, res) => {
 
   const { text } = parsed.data;
 
-  if (!process.env.INWORLD_API_KEY) {
-    res.status(500).json({ error: "Inworld API key not configured" });
-    return;
-  }
-
   try {
-    const [keyId, keySecret] = process.env.INWORLD_API_KEY.split(":");
-    const basicAuth = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-
-    const inworldRes = await fetch(
-      "https://studio.inworld.ai/v1/workspaces/-/characters/-:simpleSendText",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Basic ${basicAuth}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text,
-          config: {
-            generateAudio: true,
-          },
-        }),
-      }
-    );
-
-    if (!inworldRes.ok) {
-      // Fallback to OpenAI TTS if Inworld fails
-      req.log.warn({ status: inworldRes.status }, "Inworld TTS failed, falling back to OpenAI TTS");
-      const mp3 = await openai.audio.speech.create({
-        model: "tts-1-hd",
-        voice: "nova",
-        input: text,
-        response_format: "mp3",
-      });
-      const buffer = Buffer.from(await mp3.arrayBuffer());
-      res.json({ audio: buffer.toString("base64"), format: "mp3" });
-      return;
-    }
-
-    const data = await inworldRes.json() as { audioChunk?: string; audio_content?: string };
-    const audioBase64 = data.audioChunk || data.audio_content;
-
-    if (!audioBase64) {
-      // Fallback to OpenAI TTS
-      req.log.warn("No audio in Inworld response, falling back to OpenAI TTS");
-      const mp3 = await openai.audio.speech.create({
-        model: "tts-1-hd",
-        voice: "nova",
-        input: text,
-        response_format: "mp3",
-      });
-      const buffer = Buffer.from(await mp3.arrayBuffer());
-      res.json({ audio: buffer.toString("base64"), format: "mp3" });
-      return;
-    }
-
-    res.json({ audio: audioBase64, format: "wav" });
+    const mp3 = await openai.audio.speech.create({
+      model: "tts-1-hd",
+      voice: "nova",
+      input: text,
+      response_format: "mp3",
+    });
+    const buffer = Buffer.from(await mp3.arrayBuffer());
+    res.json({ audio: buffer.toString("base64"), format: "mp3" });
   } catch (err) {
-    req.log.error({ err }, "TTS error, falling back to OpenAI");
-    try {
-      const mp3 = await openai.audio.speech.create({
-        model: "tts-1-hd",
-        voice: "nova",
-        input: text,
-        response_format: "mp3",
-      });
-      const buffer = Buffer.from(await mp3.arrayBuffer());
-      res.json({ audio: buffer.toString("base64"), format: "mp3" });
-    } catch (fallbackErr) {
-      req.log.error({ err: fallbackErr }, "TTS fallback also failed");
-      res.status(500).json({ error: "TTS failed" });
-    }
+    req.log.error({ err }, "TTS failed");
+    res.status(500).json({ error: "TTS failed" });
   }
 });
 
