@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { todosTable, alarmsTable, chatMessagesTable } from "@workspace/db";
+import { todosTable, chatMessagesTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { openai } from "../lib/openai";
+import { getDynamicOpenAI } from "../lib/openai-dynamic";
 import { openai as audioOpenai } from "@workspace/integrations-openai-ai-server/audio";
 import {
   TranscribeAudioBody,
@@ -12,11 +12,8 @@ import {
   UpdateTodoBody,
   UpdateTodoParams,
   DeleteTodoParams,
-  CreateAlarmBody,
-  UpdateAlarmBody,
-  UpdateAlarmParams,
-  DeleteAlarmParams,
 } from "@workspace/api-zod";
+import { openai as staticOpenai } from "../lib/openai";
 
 const router = Router();
 
@@ -30,7 +27,7 @@ When the user asks for code, format it in clean code blocks with the language sp
 You can help with:
 - Writing and explaining code in any language
 - Answering technical and general questions
-- Managing their to-do list and alarms (tell them to use the side panel)
+- Managing their to-do list (tell them to use the side panel)
 - Giving step-by-step directions
 - Problem solving and reasoning
 
@@ -48,24 +45,39 @@ router.post("/mani/transcribe", async (req, res) => {
     const { audio, format } = parsed.data;
     const audioBuffer = Buffer.from(audio, "base64");
     const audioFormat = (format as "webm" | "wav" | "mp4" | "m4a" | "ogg") || "webm";
-
     const audioFile = new File([audioBuffer], `audio.${audioFormat}`, {
       type: `audio/${audioFormat}`,
     });
 
+    const openai = await getDynamicOpenAI();
     const transcription = await openai.audio.transcriptions.create({
       file: audioFile,
       model: "gpt-4o-transcribe",
       response_format: "json",
       language: "en",
       prompt:
-        "The user is speaking casual conversational English. They may have an accent or unclear pronunciation. Transcribe exactly what is said, including informal words, slang, and incomplete sentences.",
+        "The user is speaking casual conversational English. They may have an accent or unclear pronunciation. Transcribe exactly what is said.",
     });
 
     res.json({ text: transcription.text });
   } catch (err) {
     req.log.error({ err }, "Transcription error");
-    res.status(500).json({ error: "Failed to transcribe audio" });
+    // Try fallback with static client
+    try {
+      const { audio, format } = (parsed as { data: { audio: string; format?: string } }).data;
+      const audioBuffer = Buffer.from(audio, "base64");
+      const audioFormat = (format as "webm" | "wav" | "mp4" | "m4a" | "ogg") || "webm";
+      const audioFile = new File([audioBuffer], `audio.${audioFormat}`, { type: `audio/${audioFormat}` });
+      const transcription = await staticOpenai.audio.transcriptions.create({
+        file: audioFile,
+        model: "gpt-4o-transcribe",
+        response_format: "json",
+        language: "en",
+      });
+      res.json({ text: transcription.text });
+    } catch {
+      res.status(500).json({ error: "Failed to transcribe audio" });
+    }
   }
 });
 
@@ -78,31 +90,28 @@ router.post("/mani/chat", async (req, res) => {
   }
 
   const { message, history } = parsed.data;
+  const userId = req.session?.userId ?? null;
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
 
   try {
-    // Build messages array
     const messages: { role: "system" | "user" | "assistant"; content: string }[] = [
       { role: "system", content: MANI_SYSTEM_PROMPT },
     ];
 
-    if (history && history.length > 0) {
+    if (history?.length) {
       for (const h of history) {
-        messages.push({
-          role: h.role as "user" | "assistant",
-          content: h.content,
-        });
+        messages.push({ role: h.role as "user" | "assistant", content: h.content });
       }
     }
-
     messages.push({ role: "user", content: message });
 
-    // Save user message to DB
-    await db.insert(chatMessagesTable).values({ role: "user", content: message });
+    // Save user message
+    await db.insert(chatMessagesTable).values({ role: "user", content: message, userId });
 
+    const openai = await getDynamicOpenAI();
     let fullResponse = "";
     const stream = await openai.chat.completions.create({
       model: "gpt-5.4",
@@ -119,9 +128,7 @@ router.post("/mani/chat", async (req, res) => {
       }
     }
 
-    // Save assistant message to DB
-    await db.insert(chatMessagesTable).values({ role: "assistant", content: fullResponse });
-
+    await db.insert(chatMessagesTable).values({ role: "assistant", content: fullResponse, userId });
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
     res.end();
   } catch (err) {
@@ -150,20 +157,13 @@ router.post("/mani/tts", async (req, res) => {
       modalities: ["text", "audio"],
       audio: { voice: safeVoice, format: "mp3" },
       messages: [
-        {
-          role: "system",
-          content: "You are a text-to-speech assistant. Repeat the user's text verbatim, naturally and clearly.",
-        },
+        { role: "system", content: "You are a text-to-speech assistant. Repeat the user's text verbatim, naturally and clearly." },
         { role: "user", content: text },
       ],
     });
 
     const audioData = ((response.choices[0]?.message as unknown) as { audio?: { data?: string } } | undefined)?.audio?.data ?? "";
-    if (!audioData) {
-      res.status(204).end();
-      return;
-    }
-
+    if (!audioData) { res.status(204).end(); return; }
     res.json({ audio: audioData, format: "mp3" });
   } catch (err) {
     req.log.warn({ err }, "gpt-audio-mini TTS failed");
@@ -180,10 +180,7 @@ router.get("/mani/todos", async (req, res) => {
 // POST /api/mani/todos
 router.post("/mani/todos", async (req, res) => {
   const parsed = CreateTodoBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid body" });
-    return;
-  }
+  if (!parsed.success) { res.status(400).json({ error: "Invalid body" }); return; }
   const [todo] = await db.insert(todosTable).values({ text: parsed.data.text }).returning();
   res.status(201).json(todo);
 });
@@ -191,106 +188,46 @@ router.post("/mani/todos", async (req, res) => {
 // PUT /api/mani/todos/:id
 router.put("/mani/todos/:id", async (req, res) => {
   const paramsParsed = UpdateTodoParams.safeParse({ id: Number(req.params.id) });
-  if (!paramsParsed.success) {
-    res.status(400).json({ error: "Invalid id" });
-    return;
-  }
+  if (!paramsParsed.success) { res.status(400).json({ error: "Invalid id" }); return; }
   const bodyParsed = UpdateTodoBody.safeParse(req.body);
-  if (!bodyParsed.success) {
-    res.status(400).json({ error: "Invalid body" });
-    return;
-  }
-  const [todo] = await db
-    .update(todosTable)
-    .set(bodyParsed.data)
-    .where(eq(todosTable.id, paramsParsed.data.id))
-    .returning();
-  if (!todo) {
-    res.status(404).json({ error: "Not found" });
-    return;
-  }
+  if (!bodyParsed.success) { res.status(400).json({ error: "Invalid body" }); return; }
+  const [todo] = await db.update(todosTable).set(bodyParsed.data).where(eq(todosTable.id, paramsParsed.data.id)).returning();
+  if (!todo) { res.status(404).json({ error: "Not found" }); return; }
   res.json(todo);
 });
 
 // DELETE /api/mani/todos/:id
 router.delete("/mani/todos/:id", async (req, res) => {
   const parsed = DeleteTodoParams.safeParse({ id: Number(req.params.id) });
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid id" });
-    return;
-  }
+  if (!parsed.success) { res.status(400).json({ error: "Invalid id" }); return; }
   await db.delete(todosTable).where(eq(todosTable.id, parsed.data.id));
-  res.status(204).end();
-});
-
-// GET /api/mani/alarms
-router.get("/mani/alarms", async (req, res) => {
-  const alarms = await db.select().from(alarmsTable).orderBy(alarmsTable.time);
-  res.json(alarms);
-});
-
-// POST /api/mani/alarms
-router.post("/mani/alarms", async (req, res) => {
-  const parsed = CreateAlarmBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid body" });
-    return;
-  }
-  const [alarm] = await db
-    .insert(alarmsTable)
-    .values({ label: parsed.data.label, time: parsed.data.time, days: parsed.data.days ?? [] })
-    .returning();
-  res.status(201).json(alarm);
-});
-
-// PUT /api/mani/alarms/:id
-router.put("/mani/alarms/:id", async (req, res) => {
-  const paramsParsed = UpdateAlarmParams.safeParse({ id: Number(req.params.id) });
-  if (!paramsParsed.success) {
-    res.status(400).json({ error: "Invalid id" });
-    return;
-  }
-  const bodyParsed = UpdateAlarmBody.safeParse(req.body);
-  if (!bodyParsed.success) {
-    res.status(400).json({ error: "Invalid body" });
-    return;
-  }
-  const [alarm] = await db
-    .update(alarmsTable)
-    .set(bodyParsed.data)
-    .where(eq(alarmsTable.id, paramsParsed.data.id))
-    .returning();
-  if (!alarm) {
-    res.status(404).json({ error: "Not found" });
-    return;
-  }
-  res.json(alarm);
-});
-
-// DELETE /api/mani/alarms/:id
-router.delete("/mani/alarms/:id", async (req, res) => {
-  const parsed = DeleteAlarmParams.safeParse({ id: Number(req.params.id) });
-  if (!parsed.success) {
-    res.status(400).json({ error: "Invalid id" });
-    return;
-  }
-  await db.delete(alarmsTable).where(eq(alarmsTable.id, parsed.data.id));
   res.status(204).end();
 });
 
 // GET /api/mani/history
 router.get("/mani/history", async (req, res) => {
-  const messages = await db
-    .select()
-    .from(chatMessagesTable)
-    .orderBy(desc(chatMessagesTable.createdAt))
-    .limit(50);
+  const userId = req.session?.userId ?? null;
+  const query = db.select().from(chatMessagesTable).orderBy(desc(chatMessagesTable.createdAt)).limit(50);
+  if (userId) {
+    const messages = await db.select().from(chatMessagesTable)
+      .where(eq(chatMessagesTable.userId, userId))
+      .orderBy(desc(chatMessagesTable.createdAt))
+      .limit(50);
+    res.json(messages.reverse());
+    return;
+  }
+  const messages = await query;
   res.json(messages.reverse());
 });
 
 // DELETE /api/mani/history
 router.delete("/mani/history", async (req, res) => {
-  await db.delete(chatMessagesTable);
+  const userId = req.session?.userId ?? null;
+  if (userId) {
+    await db.delete(chatMessagesTable).where(eq(chatMessagesTable.userId, userId));
+  } else {
+    await db.delete(chatMessagesTable);
+  }
   res.status(204).end();
 });
 

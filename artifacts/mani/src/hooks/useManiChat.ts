@@ -63,7 +63,7 @@ function cleanForSpeech(text: string): string {
 }
 
 const SILENCE_THRESHOLD = 12; // frequency bin RMS threshold
-const SILENCE_DURATION_MS = 3000; // 3 seconds
+const SILENCE_DURATION_MS = 2000; // 2 seconds
 
 export function useManiChat({
   voiceConfig = DEFAULT_VOICE_CONFIG,
