@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
-import { LayoutGrid, Trash2, Send, ChevronDown, Volume2, LogOut } from "lucide-react";
+import { LayoutGrid, Trash2, Send, ChevronDown, Volume2, LogOut, ShieldCheck } from "lucide-react";
 import { MicButton } from "@/components/MicButton";
 import { ChatMessage } from "@/components/ChatMessage";
 import { SidePanel } from "@/components/SidePanel";
@@ -126,6 +126,12 @@ function ManiApp() {
             className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border transition-all">
             <LayoutGrid size={15} />
           </button>
+          {auth.user.isAdmin && (
+            <button onClick={() => void navigate("/xadmin")} title="Admin panel"
+              className="p-2 rounded-xl text-primary/60 hover:text-primary hover:bg-primary/10 border border-transparent hover:border-primary/30 transition-all">
+              <ShieldCheck size={15} />
+            </button>
+          )}
           <button onClick={() => void auth.logout()} title="Sign out"
             className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-card border border-transparent hover:border-border transition-all">
             <LogOut size={15} />

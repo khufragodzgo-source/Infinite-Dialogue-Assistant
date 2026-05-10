@@ -78,6 +78,34 @@ export function useManiChat({
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  // Load chat history from server on mount
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch("/api/mani/history");
+        if (!res.ok) return;
+        const data = (await res.json()) as Array<{
+          id: number;
+          role: string;
+          content: string;
+          createdAt: string;
+        }>;
+        if (data.length > 0) {
+          setMessages(
+            data.map((m) => ({
+              id: `db-${m.id}`,
+              role: m.role as "user" | "assistant",
+              content: m.content,
+            }))
+          );
+        }
+      } catch {
+        // ignore — start fresh
+      }
+    };
+    void load();
+  }, []);
   const audioContextRef = useRef<AudioContext | null>(null);
   const vadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const silenceMsRef = useRef(0);
